@@ -1,0 +1,45 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.log
+db.sqlite3*
+vault.key
+ansible.cfg
+client/build/
+../server_chtpz/Include/
+Lib/
+Scripts/
+share/
+client/build
+client/dist
+to.spec
+matrixprofile
+test*
+pyvenv.cfg
+Dataset/*.csv
+Dataset/*normalize.txt
+*.exe
+*client.spec
+*.txt
+# Environments
+*.env
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+log/
+# IDEA
+.idea
+.vscode
+*.xls
+# UML diagrams
+UML/
+*.csv
+history.json
+normalize.txt
+current_params.json
+
