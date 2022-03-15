@@ -1,4 +1,6 @@
 # Normalize,aug,search
+# -*- coding: utf-8 -*-
+
 import zipfile
 
 import numpy as np
@@ -10,7 +12,7 @@ from sklearn import preprocessing
 import json
 import os
 import tensorflow as tf
-from preprocess.const import *
+from Preprocess.const import *
 
 
 # from API import Image
@@ -136,7 +138,7 @@ def create_dataset(size_subsequent: int, dataset: Path, snippet_count: int):
         count_snippet = snippet_list.shape[0]
         print(f"Для {idx + 1} признака найденно снипеттов:{count_snippet}")
         snippet_list.snippet = snippet_list.snippet.apply(lambda x: json.dumps(x.tolist()))
-        snippet_list.to_csv(dataset / SNIPPET_FILE_NAME.format(idx + 1))
+        snippet_list.to_csv(dataset / SNIPPET_FILE_NAME.format(idx + 1),  compression='gzip')
 
     """
     X_classifier = []

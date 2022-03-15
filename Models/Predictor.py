@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from torch import nn
 import torch
 
@@ -31,7 +33,7 @@ class Predictor(nn.Module):
         self.last = nn.Linear(self.hidden_dim // 8 + dim, dim)
         self.relu_last = nn.ReLU()
 
-    def forward(self, x, h):
+    def forward(self, x):
         snippet = self.classifier(x)
         snip = self.snippet_tensor(snippet)
         last = snip[:, :, -1]
@@ -52,7 +54,7 @@ class Predictor(nn.Module):
         x = torch.cat((x, last), dim=1)
         x = self.last(x)
         x = nn.LeakyReLU()(x)
-        return x, snippet.argmax(dim=1)
+        return x
 
     def snippet_tensor(self, snippet):
         arr = []
