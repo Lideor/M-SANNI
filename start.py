@@ -16,9 +16,7 @@ import argparse
 
 from Preprocess.const import *
 
-torch.set_default_dtype(torch.double)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+torch.set_default_dtype(torch.float32)
 # Fixme добавить полное описание ключей
 def init_args():
     parser = argparse.ArgumentParser(description='M-SANNI')
@@ -28,15 +26,33 @@ def init_args():
                         action='store', dest='batch_size', help='batch size')
     parser.add_argument('-d', "--dataset", type=lambda x: Path() / "Dataset" / x,
                         action='store', dest='dataset', help='dataset name')
-    parser.add_argument('-c'"--count_snippet", type=int,
+    parser.add_argument('-c', "--count_snippet", type=int,
                         action='store', dest='count_snippet', help='count snippet')
+    parser.add_argument('-g', default=False, action="store_true", dest='gpu', help='train on gpu')
+    parser.add_argument('--epoch_predict', default=300,
+                        action="store",type=int,
+                        dest='epoch_pr', help='train on gpu')
+    parser.add_argument('--epoch_classifier', default=10,type=int,
+                        action="store", dest='epoch_cl', help='train on gpu')
     return parser.parse_args()
 
 
 if __name__ == '__main__':
+
     parser_args = init_args()
+    print(parser_args)
+
+    # torch.set_default_dtype(torch.double)
+    if parser_args.gpu and torch.cuda.is_available():
+        CUDA = True
+    else:
+        CUDA = False
+    print(parser_args.gpu)
+    device = torch.device('cuda' if CUDA else 'cpu')
     run_model(size_subsequent=parser_args.size_subsequent,
               dataset=parser_args.dataset,
+              epoch_cl=parser_args.epoch_cl,
+              epoch_pr=parser_args.epoch_pr,
               count_snippet=parser_args.count_snippet,
               batch_size=parser_args.batch_size,
               device=device)

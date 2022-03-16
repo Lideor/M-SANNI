@@ -28,7 +28,9 @@ class PredictorLoader(Dataset):
 
 class PredictorDataset:
     def __init__(self, data_dir: Path, size_subsequent,
-                 shuffle=False, random=2366, batch_size=32, test_size=0.25):
+                 shuffle=False, random=2366,
+                 device=torch.device("cpu"),
+                 batch_size=32, test_size=0.25):
 
         self.data_dir = data_dir
         self.shuffle = shuffle
@@ -50,11 +52,11 @@ class PredictorDataset:
                                               "snippet": json.loads})
             self.snippet_count.append(snippet.shape[0])
             self.snippet_list_arr.append(snippet)
-            self.original_snippet.append(snippet.snippet.values)
+            self.original_snippet.append(snippet.snippet.values.tolist())
         X = []
         for indx in range(0, len(self.data) - size_subsequent):
             X.append(self.data[indx:indx + size_subsequent, :].tolist())
-        X = torch.Tensor(X)
+        X = torch.tensor(X, device=device)
         y = X[:, -1]
         X = X[:, :-1].transpose(1, 2)
         self.dataset = {}
@@ -79,7 +81,9 @@ class PredictorDataset:
         self.dataset["train"] = [X_train, y_train]
 
     def get_loader(self, type_dataset):
+        print("батчи:",self.batch_size)
+
         return DataLoader(PredictorLoader(
             self.dataset[type_dataset][0],
-            self.dataset[type_dataset][1],
-            batch_size=self.batch_size))
+            self.dataset[type_dataset][1]),
+            batch_size=self.batch_size)

@@ -13,7 +13,9 @@ from Preprocess.const import *
 from torch.utils.data import DataLoader
 from torch import tensor, transpose
 from tqdm import tqdm
+
 torch.set_default_dtype(torch.double)
+
 
 class ClassifierLoader(Dataset):
     def __init__(self, X, y, batch_size=32):
@@ -34,6 +36,7 @@ class ClassifierDataset:
                  batch_size=32,
                  size_subsequent=100,
                  test_size=0.25,
+                 device=torch.device("cpu"),
                  log=True):
 
         self.data_dir = data_dir
@@ -62,7 +65,7 @@ class ClassifierDataset:
                 x[:, 1] = row["key"]
                 buf.append(x)
             x = np.vstack(buf)
-            x = tensor(sorted(x, key=lambda x: x[0]), dtype=torch.long)
+            x = tensor(sorted(x, key=lambda x: x[0]),dtype=torch.long, device=device)
             test_y.append(x[:, None, 1])
 
         y = torch.cat(test_y, 1)
@@ -79,7 +82,7 @@ class ClassifierDataset:
             X.append(data_norm[indx:indx + size_subsequent - 1, :].tolist())
 
         del snippet_list_arr
-        X = tensor(X).transpose(1, 2)
+        X = tensor(X, device=device).transpose(1, 2)
         y = y[:X.shape[0]]
         # X = snippet.iloc[0].neighbors
         #
@@ -109,5 +112,8 @@ class ClassifierDataset:
         self.dataset["train"] = [X_train, y_train]
 
     def get_loader(self, type_dataset):
-        return DataLoader(ClassifierLoader(self.dataset[type_dataset][0], self.dataset[type_dataset][1]),
+        # print("батчи:", self.batch_size)
+
+        return DataLoader(ClassifierLoader(self.dataset[type_dataset][0],
+                                           self.dataset[type_dataset][1]),
                           batch_size=self.batch_size)
