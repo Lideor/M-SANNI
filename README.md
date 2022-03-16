@@ -1,4 +1,8 @@
 # M-SANNI
+Пример запуска 
+python start.py -s 300 -b 128 -c 2 -d walk_run_me
+
+#FIXME описание ключей
 
 Описание наборов данных:
 
