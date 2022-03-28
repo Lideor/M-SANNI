@@ -30,8 +30,8 @@ class Predictor(nn.Module):
                                          device=self.device)
         print(self.snippet_list.shape)
         self.dim = dim
-        self.num_layers = 1
-        self.hidden_dim = 128
+        self.num_layers = num_layers
+        self.hidden_dim = hidden_dim
         self.gru = nn.GRU(input_size=self.dim * 2,
                           hidden_size=self.hidden_dim,
                           num_layers=self.num_layers,
@@ -71,6 +71,7 @@ class Predictor(nn.Module):
         x = x.transpose(1, 2)
         x, h = self.gru(x)
         #
+        # print(x.shape)
 
         x = x[:, -1, :]
         # x = nn.LeakyReLU()(x)

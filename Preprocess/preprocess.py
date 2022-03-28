@@ -7,6 +7,10 @@ import numpy as np
 import pandas as pd
 import random
 from pathlib import Path
+import multiprocess
+from tqdm import tqdm
+
+from matrixprofile.algorithms import mpdist_vector
 from matrixprofile.algorithms.snippets import snippets
 from sklearn import preprocessing
 import json
@@ -16,45 +20,6 @@ from Preprocess.const import *
 
 
 # from API import Image
-
-
-def search_snippet(data: np.ndarray, snippet_count: int, size_subsequent: int) -> pd.DataFrame:
-    """
-    Поиск снипетов
-    :param data: Директория временного ряда: str
-    :param snippet_count: int
-    :param size_subsequent: Размер подпоследовательности - int
-    :return: Массив снипеетов - np.ndarray
-    """
-
-    snp = snippets(data,
-                   num_snippets=snippet_count,
-                   snippet_size=size_subsequent)
-
-    arr_snp = []
-    for i, item in enumerate(snp):
-        dict_ = {"key": i,
-                 "snippet": item['snippet'],
-                 "fraction": item['fraction']}
-        neighbors = []
-        index = []
-        for neighbor in item['neighbors']:
-            neighbors.append(data[neighbor:neighbor + size_subsequent].tolist())
-            index.append(neighbor)
-        dict_["neighbors"] = neighbors
-        dict_["neighbors_index"] = index
-        arr_snp.append(dict_)
-        del item
-
-    df = pd.DataFrame(arr_snp, columns=arr_snp[0].keys())
-    df = augmentation(df)
-    return df
-
-
-def normalize(sequent: np.ndarray) -> np.ndarray:
-    min_max_scaler = preprocessing.MinMaxScaler()
-    x_scaled = min_max_scaler.fit_transform(sequent)
-    return x_scaled
 
 
 def augmentation(data: pd.DataFrame, e=0.01):
@@ -130,15 +95,21 @@ def create_dataset(size_subsequent: int, dataset: Path, snippet_count: int):
         data = data.reshape(-1, 1)
     data_norm = normalize(data)
     np.savetxt(dataset / NORM_DATA_FILE_NAME, data_norm)
-    print("Начал поиск сниппетов")
-    for idx, dim in enumerate(data_norm.T):
-        snippet_list = search_snippet(data=dim,
+    print("Начал поиск сниппетов",__name__ )
+    max_snippet = -1
+    for idx, data in enumerate(data_norm.T):
+        distant = get_distances(ts=data, snippet_size=size_subsequent)
+        count_snippet = get_count(distances=distant,
+                                  snippet_size=size_subsequent,
+                                  len_ts=len(data))
+        if count_snippet > max_snippet:
+            max_snippet = count_snippet
+        print(f"Для {idx + 1} признака найденно снипеттов:{count_snippet}")
+        snippet_list = search_snippet(data=data,
                                       snippet_count=snippet_count,
                                       size_subsequent=size_subsequent)
-        count_snippet = snippet_list.shape[0]
-        print(f"Для {idx + 1} признака найденно снипеттов:{count_snippet}")
         snippet_list.snippet = snippet_list.snippet.apply(lambda x: json.dumps(x.tolist()))
-        snippet_list.to_csv(dataset / SNIPPET_FILE_NAME.format(idx + 1),  compression='gzip')
+        snippet_list.to_csv(dataset / SNIPPET_FILE_NAME.format(idx + 1), compression='gzip')
 
     """
     X_classifier = []
@@ -160,7 +131,7 @@ def create_dataset(size_subsequent: int, dataset: Path, snippet_count: int):
     """
     X_predict = []
     y_predict = []
-    
+
     for i, item in snippet_list.iterrows():
         for neighbour in item.neighbors:
             if len(neighbour) == size_subsequent:
@@ -198,14 +169,92 @@ def create_dataset(size_subsequent: int, dataset: Path, snippet_count: int):
 
     result = {
         "size_subsequent": size_subsequent,
-        "classifier": False,
-        "predictor": False,
-        "predictor_label": False,
-        "clear": False,
-        "snippet_count": snippet_count
+        "snippet_count": max_snippet
     }
 
     with open(dataset / CURRENT_PARAMS_FILE_NAME, 'w') as outfile:
         json.dump(result, outfile)
     print("Сохранил сниппеты")
-    return count_snippet, snippet_list
+    return max_snippet
+
+
+def search_snippet(data: np.ndarray, snippet_count: int, size_subsequent: int) -> pd.DataFrame:
+    """
+    Поиск снипетов
+    :param data: Директория временного ряда: str
+    :param snippet_count: int
+    :param size_subsequent: Размер подпоследовательности - int
+    :return: Массив снипеетов - np.ndarray
+    """
+
+    snp = snippets(data,
+                   num_snippets=snippet_count,
+                   snippet_size=size_subsequent)
+
+    arr_snp = []
+    for i, item in enumerate(snp):
+        dict_ = {"key": i,
+                 "snippet": item['snippet'],
+                 "fraction": item['fraction']}
+        neighbors = []
+        index = []
+        for neighbor in item['neighbors']:
+            neighbors.append(data[neighbor:neighbor + size_subsequent].tolist())
+            index.append(neighbor)
+        dict_["neighbors"] = neighbors
+        dict_["neighbors_index"] = index
+        arr_snp.append(dict_)
+        del item
+
+    df = pd.DataFrame(arr_snp, columns=arr_snp[0].keys())
+    df = augmentation(df)
+    return df
+
+
+def normalize(sequent: np.ndarray) -> np.ndarray:
+    min_max_scaler = preprocessing.MinMaxScaler()
+    x_scaled = min_max_scaler.fit_transform(sequent)
+    return x_scaled
+
+
+def get_distances(ts, snippet_size):
+    window_size = np.floor(snippet_size / 2)
+    indices = np.arange(0, len(ts) - snippet_size, snippet_size)
+    distances = []
+
+    f = lambda i: mpdist_vector(ts=ts, ts_b=ts[i:(i + snippet_size - 1)], w=int(window_size))
+    pool_obj = multiprocess.Pool()
+    distances = pool_obj.map(f, indices)
+    pool_obj.close()
+    distances = np.array(distances)
+    del pool_obj
+
+    # for i in tqdm(indices):
+    #     distance = mpdist_vector(ts, ts[i:(i + snippet_size - 1)], int(window_size))
+    #     distances.append(distance)
+
+    return np.array(distances)
+
+
+def get_count(distances, snippet_size, len_ts, max_k=9):
+    profilearea = []
+    indices = np.arange(0, len_ts - snippet_size, snippet_size)
+    minis = np.inf
+    for n in range(max_k):
+        minims = np.inf
+        for i in range(len(indices)):
+            s = np.sum(np.minimum(distances[i, :], minis))
+
+            if minims > s:
+                minims = s
+                index = i
+
+        minis = np.minimum(distances[index, :], minis)
+        profilearea.append(np.sum(minis))
+    change = -np.diff(profilearea)
+
+    for i in range(2, len(change)):
+        count = (np.trapz(change[:i], dx=1) - np.trapz(change[:i - 1])) / (np.trapz(change[:i], dx=1) + 1)
+        if count < 0.2:
+            return i - 2
+    return len(change)

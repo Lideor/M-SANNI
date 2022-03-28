@@ -1,43 +1,46 @@
 # -*- coding: utf-8 -*-
-
-import json
-
-from DataRead.PredictorLoader import PredictorDataset
-from Models.Classifier import Classifier
-from Models.Predictor import Predictor
-from Preprocess.preprocess import create_dataset
-from DataRead.ClassifierLoader import ClassifierDataset
-from pathlib import Path
-from sklearn.metrics import precision_score, mean_squared_error, accuracy_score
-from Models.Helpers import train, run_model
-import torch
-import numpy as np
-import argparse
-
-from Preprocess.const import *
-
-torch.set_default_dtype(torch.float32)
-# Fixme добавить полное описание ключей
-def init_args():
-    parser = argparse.ArgumentParser(description='M-SANNI')
-    parser.add_argument('-s', "--size_subsequent", type=int,
-                        action='store', dest='size_subsequent', help='size subsequent')
-    parser.add_argument('-b', "--batch_size", type=int,
-                        action='store', dest='batch_size', help='batch size')
-    parser.add_argument('-d', "--dataset", type=lambda x: Path() / "Dataset" / x,
-                        action='store', dest='dataset', help='dataset name')
-    parser.add_argument('-c', "--count_snippet", type=int,
-                        action='store', dest='count_snippet', help='count snippet')
-    parser.add_argument('-g', default=False, action="store_true", dest='gpu', help='train on gpu')
-    parser.add_argument('--epoch_predict', default=300,
-                        action="store",type=int,
-                        dest='epoch_pr', help='train on gpu')
-    parser.add_argument('--epoch_classifier', default=10,type=int,
-                        action="store", dest='epoch_cl', help='train on gpu')
-    return parser.parse_args()
-
-
 if __name__ == '__main__':
+
+    import json
+
+    from DataRead.PredictorLoader import PredictorDataset
+    from Models.Classifier import Classifier
+    from Models.Predictor import Predictor
+    from Preprocess.preprocess import create_dataset
+    from DataRead.ClassifierLoader import ClassifierDataset
+    from pathlib import Path
+    from sklearn.metrics import precision_score, mean_squared_error, accuracy_score
+    from Models.Helpers import train, run_model
+    import torch
+    import numpy as np
+    import argparse
+
+    from Preprocess.const import *
+
+    torch.set_default_dtype(torch.float32)
+
+
+    # Fixme добавить полное описание ключей
+    def init_args():
+        parser = argparse.ArgumentParser(description='M-SANNI')
+        parser.add_argument('-s', "--size_subsequent", type=int,
+                            action='store', dest='size_subsequent', help='size subsequent')
+        parser.add_argument('-b', "--batch_size", type=int,
+                            action='store', dest='batch_size', help='batch size')
+        parser.add_argument('-d', "--dataset", type=lambda x: Path() / "Dataset" / x,
+                            action='store', dest='dataset', help='dataset name')
+        parser.add_argument('-c', "--count_snippet", type=int,
+                            action='store', dest='count_snippet', help='count snippet')
+        parser.add_argument('-g', default=False, action="store_true", dest='gpu', help='train on gpu')
+        parser.add_argument('--epoch_predict', default=300,
+                            action="store", type=int,
+                            dest='epoch_pr', help='train on gpu')
+        parser.add_argument('--epoch_classifier', default=10, type=int,
+                            action="store", dest='epoch_cl', help='train on gpu')
+        parser.add_argument('--num_layers', default=1, type=int,
+                            action="store", dest='num_layers', help='layer gpu')
+        return parser.parse_args()
+
 
     parser_args = init_args()
     print(parser_args)
@@ -53,6 +56,7 @@ if __name__ == '__main__':
               dataset=parser_args.dataset,
               epoch_cl=parser_args.epoch_cl,
               epoch_pr=parser_args.epoch_pr,
+              bar=False,
               count_snippet=parser_args.count_snippet,
               batch_size=parser_args.batch_size,
               device=device)

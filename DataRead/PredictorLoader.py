@@ -81,7 +81,7 @@ class PredictorDataset:
         self.dataset["train"] = [X_train, y_train]
 
     def get_loader(self, type_dataset):
-        print("батчи:",self.batch_size)
+        # print("батчи:",self.batch_size)
 
         return DataLoader(PredictorLoader(
             self.dataset[type_dataset][0],

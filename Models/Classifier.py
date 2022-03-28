@@ -14,7 +14,7 @@ class Classifier(nn.Module):
         self.count_snippet = count_snippet
         in_channels = dim
         self.out_channels = 256
-
+        #fixme переписать под блоки
         self.cnn_1 = nn.Conv1d(in_channels=in_channels,
                                out_channels=self.out_channels,
                                padding=2,
@@ -89,7 +89,7 @@ class Classifier(nn.Module):
         return x
 
     def get_loss(self, predict, true):
-        print(predict[:, :, 0].shape, true.shape)
+        # print(predict[:, :, 0].shape, true.shape)
         loss_arr = torch.nn.CrossEntropyLoss()(predict[:, :, 0], true[:, 0])
         for i in range(1, self.dim):
             loss_arr += torch.nn.CrossEntropyLoss()(predict[:, :, i], true[:, i])

@@ -37,7 +37,7 @@ class ClassifierDataset:
                  size_subsequent=100,
                  test_size=0.25,
                  device=torch.device("cpu"),
-                 log=True):
+                 log=False):
 
         self.data_dir = data_dir
         self.shuffle = shuffle
