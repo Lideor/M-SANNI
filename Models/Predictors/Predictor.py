@@ -49,32 +49,47 @@ class Predictor(nn.Module):
     def forward(self, x):
         # full_time = time.time()
         # start_time = time.time()
-        with torch.no_grad():
-            snippet = self.classifier(x).argmax(dim=1).cpu()
-        # torch.cuda.synchronize()
-        # print("1--- %s seconds ---" % (time.time() - start_time))
-        # start_time = time.time()
-
-        snip = self.snippet_tensor(snippet)
-        # print("1.1--- %s seconds ---" % (time.time() - start_time))
-        # start_time = time.time()
-        # snip = snip.to(self.device)
-
-        last = snip[:, :, -1]
-        snip = snip[:, :, :-1]
-        # print("1.2--- %s seconds ---" % (time.time() - start_time))
-        # start_time = time.time()
-        x = torch.cat((x, snip), dim=1)
+        # with torch.no_grad():
+        #     snippet = self.classifier(x).argmax(dim=1).cpu()
+        # # torch.cuda.synchronize()
+        # # print("1--- %s seconds ---" % (time.time() - start_time))
+        # # start_time = time.time()
+        #
+        # snip = self.snippet_tensor(snippet)
+        # # print("1.1--- %s seconds ---" % (time.time() - start_time))
+        # # start_time = time.time()
+        # # snip = snip.to(self.device)
+        #
+        # last = snip[:, :, -1]
+        # snip = snip[:, :, :-1]
+        # # print("1.2--- %s seconds ---" % (time.time() - start_time))
+        # # start_time = time.time()
+        # x = torch.cat((x, snip), dim=1)
         # print("2--- %s seconds ---" % (time.time() - start_time))
         # start_time = time.time()
+        x, last = self.augmentation(x)
+        x = self.gru_layers(x, last)
+        # x = nn.LeakyReLU()(x)
+        x = self.last_layers(x, last)
+        # print("3--- %s seconds ---" % (time.time() - start_time))
+        # print("3--- %s seconds ---" % (time.time() - full_time))
+        return x
 
+    def augmentation(self, x):
+        with torch.no_grad():
+            snippet = self.classifier(x).argmax(dim=1).cpu()
+        snip = self.snippet_tensor(snippet)
+        last = snip[:, :, -1]
+        snip = snip[:, :, :-1]
+        x = torch.cat((x, snip), dim=1)
+        return x, last
+
+    def gru_layers(self, x, last):
         x = x.transpose(1, 2)
         x, h = self.gru(x)
-        #
-        # print(x.shape)
+        return x[:, -1, :]
 
-        x = x[:, -1, :]
-        # x = nn.LeakyReLU()(x)
+    def last_layers(self, x, last):
         x = self.fs1(x)
         x = nn.LeakyReLU()(x)
         x = self.fs2(x)
@@ -84,8 +99,6 @@ class Predictor(nn.Module):
         x = torch.cat((x, last), dim=1)
         x = self.last(x)
         x = nn.LeakyReLU()(x)
-        # print("3--- %s seconds ---" % (time.time() - start_time))
-        # print("3--- %s seconds ---" % (time.time() - full_time))
         return x
 
     def snippet_tensor(self, snippet):

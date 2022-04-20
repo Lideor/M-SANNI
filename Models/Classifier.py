@@ -14,7 +14,7 @@ class Classifier(nn.Module):
         self.count_snippet = count_snippet
         in_channels = dim
         self.out_channels = 256
-        #fixme переписать под блоки
+        # fixme переписать под блоки
         self.cnn_1 = nn.Conv1d(in_channels=in_channels,
                                out_channels=self.out_channels,
                                padding=2,
@@ -48,14 +48,14 @@ class Classifier(nn.Module):
         #     in_channels = self.out_channels
         #     self.size_subsequent = self.size_subsequent // 2
 
-        self.gru = nn.GRU(input_size=self.out_channels,
+        self.gru = nn.GRU(input_size=self.size_subsequent,
                           batch_first=True,
                           hidden_size=self.hidden_size)
         # self.last = nn.Linear(self.hidden_size, count_snippet * dim)
-        self.linear = nn.Linear(self.out_channels * self.size_subsequent,
-                                self.out_channels * self.size_subsequent // 2)
+        self.linear = nn.Linear(self.hidden_size,
+                                self.hidden_size)
 
-        self.last = nn.Linear(self.out_channels * self.size_subsequent // 2,
+        self.last = nn.Linear(self.hidden_size,
                               count_snippet * dim)
 
     def forward(self, x):
@@ -79,8 +79,8 @@ class Classifier(nn.Module):
         x = self.cnn_3(x)
         x = nn.ReLU()(x)
         x = self.max_3(x)
-
-        x = x.reshape(-1, self.out_channels * self.size_subsequent)
+        x, _ = self.gru(x)
+        x = x[:, -1, :]
         x = self.linear(x)
         x = nn.ReLU()(x)
         x = self.last(x)

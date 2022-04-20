@@ -18,6 +18,10 @@ import os
 import tensorflow as tf
 from Preprocess.const import *
 
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_percentage_error
+from sklearn.metrics import r2_score
 
 # from API import Image
 
@@ -58,7 +62,7 @@ def augmentation(data: pd.DataFrame, e=0.01):
     return data
 
 
-def create_dataset(size_subsequent: int, dataset: Path, snippet_count: int):
+def create_dataset(size_subsequent: int, dataset: Path, snippet_count=0):
     """
     Создает zip архив в директории датасета с размеченными датасетами
     :param size_subsequent: Размер подпоследовательности
@@ -95,13 +99,16 @@ def create_dataset(size_subsequent: int, dataset: Path, snippet_count: int):
         data = data.reshape(-1, 1)
     data_norm = normalize(data)
     np.savetxt(dataset / NORM_DATA_FILE_NAME, data_norm)
-    print("Начал поиск сниппетов",__name__ )
+    print("Начал поиск сниппетов", __name__)
     max_snippet = -1
     for idx, data in enumerate(data_norm.T):
-        distant = get_distances(ts=data, snippet_size=size_subsequent)
-        count_snippet = get_count(distances=distant,
-                                  snippet_size=size_subsequent,
-                                  len_ts=len(data))
+        if snippet_count == 0:
+            distant = get_distances(ts=data, snippet_size=size_subsequent)
+            count_snippet = get_count(distances=distant,
+                                      snippet_size=size_subsequent,
+                                      len_ts=len(data))
+        else:
+            count_snippet = snippet_count
         if count_snippet > max_snippet:
             max_snippet = count_snippet
         print(f"Для {idx + 1} признака найденно снипеттов:{count_snippet}")
@@ -223,7 +230,7 @@ def get_distances(ts, snippet_size):
     distances = []
 
     f = lambda i: mpdist_vector(ts=ts, ts_b=ts[i:(i + snippet_size - 1)], w=int(window_size))
-    pool_obj = multiprocess.Pool()
+    pool_obj = multiprocess.Pool(4)
     distances = pool_obj.map(f, indices)
     pool_obj.close()
     distances = np.array(distances)
@@ -255,6 +262,23 @@ def get_count(distances, snippet_size, len_ts, max_k=9):
 
     for i in range(2, len(change)):
         count = (np.trapz(change[:i], dx=1) - np.trapz(change[:i - 1])) / (np.trapz(change[:i], dx=1) + 1)
-        if count < 0.2:
-            return i - 2
+        if count < 0.15:
+            return i
     return len(change)
+
+
+def smape(a, f):
+    return 100/len(a) * np.sum(np.abs(f-a) / ((np.abs(a) + np.abs(f))/2))
+
+
+def get_score(y_true,y_predict):
+    y_true = np.array(y_true)
+    y_predict = np.array(y_predict)
+    loss={}
+    loss["mse"] = mean_squared_error(y_true, y_predict)
+    loss["rmse"] = mean_squared_error(y_true, y_predict, squared=False)
+    loss["mae"] = mean_absolute_error(y_true, y_predict)
+    loss["mape"] = mean_absolute_percentage_error(y_true+1, y_predict+1)
+    loss["smape"] = smape(y_true+1, y_predict+1)
+    loss["r2"] = r2_score(y_true+1, y_predict+1)
+    return loss

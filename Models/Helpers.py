@@ -2,12 +2,14 @@
 import json
 
 import torch as th
+from torch.optim.lr_scheduler import StepLR
 from tqdm import tqdm
 from DataRead.PredictorLoader import PredictorDataset
 from Models.Classifier import Classifier
-from Models.Predictor import Predictor
+from Models.Predictors.Predictor import Predictor
+from Models.Predictors.OnlyCnns import OnlyCnns
 from Preprocess.const import DATA_FILE_NAME, CURRENT_PARAMS_FILE_NAME
-from Preprocess.preprocess import create_dataset
+from Preprocess.preprocess import create_dataset, get_score
 from DataRead.ClassifierLoader import ClassifierDataset
 from pathlib import Path
 from sklearn.metrics import precision_score, mean_squared_error, accuracy_score
@@ -40,10 +42,13 @@ def train(model,
           loss,
           device,
           score_func,
+          loader_test=None,
           bar=False,
           log=True):
     history = {"train": [],
                "val": []}
+    # scheduler = StepLR(optimizer, step_size=500, gamma=0.75)
+
     for epoch in range(epochs_count):
         model.train()
         predict_true = []
@@ -80,8 +85,27 @@ def train(model,
         score_val = score_func(predict_predict, predict_true)
         if log:
             print(f"\r Train:{score_train} Val:{score_val}")
+        if epoch % 100 == 0 and loader_test is not None:
+            predict_true = []
+            predict_predict = []
+            with torch.set_grad_enabled(False):
+                for x, y_true in loader_test:
+                    y_true.to(device)
+                    optimizer.zero_grad()
+                    x = x.to(device).detach()
+                    y_pred = model.forward(x)
+                    predict_true.append(y_true)
+                    predict_predict.append(y_pred.detach())
+                predict_true = th.cat(predict_true)
+                predict_predict = th.cat(predict_predict)
+                score_test = get_score(predict_true.cpu().detach(),
+                                      predict_predict.cpu().detach())
+                if log:
+                    print(f"\r Test:{score_test}")
+
         history["train"].append(score_train)
         history["val"].append(score_val)
+        # scheduler.step()
 
     return history, model
 
@@ -89,10 +113,19 @@ def train(model,
 # FIXME переделать под локоть
 def run_model(size_subsequent, dataset, count_snippet, batch_size, device,
               bar=True,
-              name="lokt",
+              model="original",
               epoch_cl=1, epoch_pr=300):
+    models = {
+        "original": Predictor,
+        "only_cnns": OnlyCnns
+    }
+
     p = Path(dataset / DATA_FILE_NAME)
-    dim = np.loadtxt(p).shape[1]
+    dim = np.loadtxt(p)
+    if len(dim.shape) > 1:
+        dim = dim.shape[1]
+    else:
+        dim = 1
     p = Path(dataset / CURRENT_PARAMS_FILE_NAME)
     current_params = json.load(open(p, "rb+"))
     print(current_params)
@@ -158,23 +191,26 @@ def run_model(size_subsequent, dataset, count_snippet, batch_size, device,
                                   batch_size=batch_size,
                                   size_subsequent=size_subsequent,
                                   device=device)
-    predictor = Predictor(size_subsequent, count_snippet,
-                          classifier=classifier,
-                          snippet_list=pr_dataset.original_snippet,
-                          dim=dim,
-                          device=device)
+
+    predictor = models[model](size_subsequent, count_snippet,
+                              classifier=classifier,
+                              snippet_list=pr_dataset.original_snippet,
+                              dim=dim,
+                              device=device)
 
     predictor = predictor.to(device)
     loss = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(predictor.parameters(), lr=1.0e-4)
+    optimizer = torch.optim.Adam(predictor.parameters(), lr=1.0e-3, amsgrad=True)
     history, _ = train(model=predictor,
                        loader=pr_dataset.get_loader("train"),
                        loader_val=pr_dataset.get_loader("val"),
+                       loader_test=pr_dataset.get_loader("test"),
                        epochs_count=epoch_pr,
                        optimizer=optimizer,
                        loss=loss,
                        device=device,
                        bar=bar,
+
                        score_func=
                        lambda y_pred,
                               y_true:
@@ -192,7 +228,8 @@ def run_model(size_subsequent, dataset, count_snippet, batch_size, device,
                                          y_true=y_true[:, i].cpu().detach())
     print(f"Test:{sum(mse / len_val) / dim}")
     print(f"Test:{mse / len_val}")
-    json.dump(str(history), open(dataset / f"{name}_{size_subsequent}_{count_snippet}_history.json", "w"))
-    json.dump(str({mse / len_val}), open(dataset / f"{name}_{size_subsequent}_{count_snippet}_test.json", "w"))
+    json.dump(str(history), open(dataset / f"{model}_{size_subsequent}_{count_snippet}_history.json", "w"))
+    # json.dump(str({mse.tolist() / len_val}), open(dataset / f"{model}_{size_subsequent}_{count_snippet}_test.json", "w"))
+    np.savetxt(dataset / f"{model}_{size_subsequent}_{count_snippet}_all.txt", mse / len_val)
     json.dump(str({sum(mse / len_val) / dim}),
-              open(dataset / f"{name}_{size_subsequent}_{count_snippet}_all.json", "w"))
+              open(dataset / f"{model}_{size_subsequent}_{count_snippet}_all.json", "w"))
