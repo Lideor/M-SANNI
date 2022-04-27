@@ -30,7 +30,10 @@ if __name__ == '__main__':
                             action='store', dest='dataset', help='dataset name')
         parser.add_argument('-c', "--count_snippet", type=int, default=0,
                             action='store', dest='count_snippet', help='count snippet')
-        parser.add_argument('-g', default=False, action="store_true", dest='gpu', help='train on gpu')
+        parser.add_argument('-g', default=False, action="store_true",
+                            dest='gpu', help='train on gpu')
+        parser.add_argument('--hidden', default=128, type=int,
+                            action="store", dest='hidden', help='hidden on gpu')
         parser.add_argument('--epoch_predict', default=300,
                             action="store", type=int,
                             dest='epoch_pr', help='train on gpu')
@@ -40,6 +43,8 @@ if __name__ == '__main__':
                             action="store", dest='num_layers', help='layer gpu')
         parser.add_argument('--model', type=str,
                             action="store", dest='model', help='layer gpu')
+        parser.add_argument('--sh', default=False, action="store_true",
+                            dest='sh', help='train on gpu')
         return parser.parse_args()
 
 
@@ -51,12 +56,14 @@ if __name__ == '__main__':
         CUDA = True
     else:
         CUDA = False
-    print(parser_args.gpu)
     device = torch.device('cuda' if CUDA else 'cpu')
     run_model(size_subsequent=parser_args.size_subsequent,
               dataset=parser_args.dataset,
               epoch_cl=parser_args.epoch_cl,
               epoch_pr=parser_args.epoch_pr,
+              hidden=parser_args.hidden,
+              sh=parser_args.sh,
+              num_layers=parser_args.num_layers,
               bar=True,
               count_snippet=parser_args.count_snippet,
               batch_size=parser_args.batch_size,

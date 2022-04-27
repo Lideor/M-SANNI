@@ -25,24 +25,21 @@ class Predictor(nn.Module):
         self.classifier = classifier.eval()
         self.device = device
 
-        print(snippet_list)
         self.snippet_list = torch.tensor(snippet_list,
                                          device=self.device)
-        print(self.snippet_list.shape)
         self.dim = dim
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
+        print(self.hidden_dim)
         self.gru = nn.GRU(input_size=self.dim * 2,
                           hidden_size=self.hidden_dim,
                           num_layers=self.num_layers,
+                          dropout=0.1,
                           batch_first=True)
         self.relu = nn.ReLU()
         self.fs1 = nn.Linear(self.hidden_dim, self.hidden_dim // 2)
-        self.relu1 = nn.ReLU()
         self.fs2 = nn.Linear(self.hidden_dim // 2, self.hidden_dim // 4)
-        self.relu2 = nn.ReLU()
         self.fs3 = nn.Linear(self.hidden_dim // 4, self.hidden_dim // 8)
-        self.relu3 = nn.ReLU()
         self.last = nn.Linear(self.hidden_dim // 8 + dim, dim)
         self.relu_last = nn.ReLU()
 
@@ -82,6 +79,7 @@ class Predictor(nn.Module):
         last = snip[:, :, -1]
         snip = snip[:, :, :-1]
         x = torch.cat((x, snip), dim=1)
+
         return x, last
 
     def gru_layers(self, x, last):
