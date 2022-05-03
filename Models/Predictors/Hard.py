@@ -27,7 +27,7 @@ class Hard(OnlyCnns):
             num_layers,
         )
         self.gru_dim = nn.ModuleList([nn.GRU(input_size=self.last_cnn,
-                                             hidden_size=self.size_subsequent-1,
+                                             hidden_size=self.size_subsequent - 1,
                                              # num_layers=1,
                                              batch_first=True) for i in range(dim)])
         self.gru = nn.GRU(input_size=self.dim,
@@ -44,9 +44,9 @@ class Hard(OnlyCnns):
         result_x = torch.zeros(size=x.shape, device=self.device)
         for i, cnn in enumerate(self.cnns3):
             input_cnn = torch.cat((x[:, i:i + 1, :], snip[:, i:i + 1, :]), dim=1)
-            input_cnn = self.cnns1[i](input_cnn)
-            input_cnn = self.cnns2[i](input_cnn)
-            result = cnn(input_cnn)
+            input_cnn = self.relu(self.cnns1[i](input_cnn))
+            input_cnn = self.relu(self.cnns2[i](input_cnn))
+            result = self.relu(cnn(input_cnn))
             result, _ = self.gru_dim[i](result.transpose(1, 2))
-            result_x[:, i:i + 1, :] = result[:,None, -1, :]
+            result_x[:, i:i + 1, :] = self.leakyRelu(result[:, None, -1, :])
         return result_x, last

@@ -41,6 +41,12 @@ if __name__ == '__main__':
                             action="store", dest='epoch_cl', help='train on gpu')
         parser.add_argument('--num_layers', default=1, type=int,
                             action="store", dest='num_layers', help='layer gpu')
+        parser.add_argument('--bn', default=False,
+                            action="store_true", dest='batch_norm', help='layer gpu')
+
+        parser.add_argument('--lr', default=1.0e-3, type=float,
+                            action="store", dest='lr', help='layer gpu')
+
         parser.add_argument('--model', type=str,
                             action="store", dest='model', help='layer gpu')
         parser.add_argument('--sh', default=False, action="store_true",
@@ -64,6 +70,8 @@ if __name__ == '__main__':
               hidden=parser_args.hidden,
               sh=parser_args.sh,
               num_layers=parser_args.num_layers,
+              lr=parser_args.lr,
+              batch_norm=parser_args.batch_norm,
               bar=True,
               count_snippet=parser_args.count_snippet,
               batch_size=parser_args.batch_size,

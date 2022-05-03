@@ -46,8 +46,13 @@ def train(model,
           loader_test=None,
           sh=False,
           early_stopping_patience=50,
+          scheduler=None,
           bar=False,
           log=True):
+    if scheduler is None:
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                               patience=10,
+                                                               factor=0.95, verbose=True),
     history = {"train": [],
                "val": []}
     # scheduler = StepLR(optimizer, step_size=500, gamma=0.75)
@@ -55,7 +60,6 @@ def train(model,
     best_val_loss = float('inf')
     best_epoch_i = 0
     best_model = copy.deepcopy(model)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.95, verbose=True)
 
     for epoch in range(epochs_count):
         model.train()
@@ -135,6 +139,8 @@ def run_model(size_subsequent,
               count_snippet,
               batch_size,
               device,
+              batch_norm=False,
+              lr=1.0e-3,
               num_layers=1,
               hidden=128,
               sh=False,
@@ -156,7 +162,6 @@ def run_model(size_subsequent,
         dim = 1
     p = Path(dataset / CURRENT_PARAMS_FILE_NAME)
     current_params = json.load(open(p, "rb+"))
-    print(current_params)
     if size_subsequent != current_params['size_subsequent']:
         count_snippet = create_dataset(size_subsequent, dataset, count_snippet)
     else:
@@ -233,29 +238,35 @@ def run_model(size_subsequent,
                               classifier=classifier,
                               snippet_list=pr_dataset.original_snippet,
                               hidden_dim=hidden,
+                              batch_norm=batch_norm,
                               dim=dim,
                               device=device)
 
     predictor = predictor.to(device)
     loss = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(predictor.parameters(), lr=1.0e-3, amsgrad=True)
+    optimizer = torch.optim.Adam(predictor.parameters(),
+                                 lr=lr,
+                                 amsgrad=True)
+    sc = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                    patience=10,
+                                                    factor=0.95, verbose=True),
     history, predictor = train(model=predictor,
                                loader=pr_dataset.get_loader("train"),
                                loader_val=pr_dataset.get_loader("val"),
                                loader_test=pr_dataset.get_loader("test"),
                                epochs_count=epoch_pr,
                                optimizer=optimizer,
+
                                loss=loss,
                                device=device,
                                bar=bar,
                                sh=sh,
+                               scheduler=sc,
                                score_func=
                                lambda y_pred,
                                       y_true:
                                mean_squared_error(y_pred=y_pred.cpu().detach(), y_true=y_true.cpu().detach()),
                                )
-    len_val = len(pr_dataset.get_loader("test"))
-    mse = np.zeros(dim)
     predictor.eval()
 
     predict_true = []

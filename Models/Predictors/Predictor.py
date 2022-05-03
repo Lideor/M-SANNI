@@ -17,6 +17,7 @@ class Predictor(nn.Module):
                  classifier: Classifier,
                  snippet_list,
                  device,
+                 batch_norm=False,
                  hidden_dim=128,
                  num_layers=1,
                  ):
@@ -24,13 +25,16 @@ class Predictor(nn.Module):
         self.size_subsequent = size_subsequent
         self.classifier = classifier.eval()
         self.device = device
-
+        if batch_norm:
+            self.batch_norm = nn.BatchNorm2d(dim)
+        else:
+            self.batch_norm = None
         self.snippet_list = torch.tensor(snippet_list,
                                          device=self.device)
         self.dim = dim
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
-        print(self.hidden_dim)
+        print(self.hidden_dim, self.batch_norm)
         self.gru = nn.GRU(input_size=self.dim * 2,
                           hidden_size=self.hidden_dim,
                           num_layers=self.num_layers,
@@ -41,7 +45,7 @@ class Predictor(nn.Module):
         self.fs2 = nn.Linear(self.hidden_dim // 2, self.hidden_dim // 4)
         self.fs3 = nn.Linear(self.hidden_dim // 4, self.hidden_dim // 8)
         self.last = nn.Linear(self.hidden_dim // 8 + dim, dim)
-        self.relu_last = nn.ReLU()
+        self.leakyRelu = nn.LeakyReLU()
 
     def forward(self, x):
         # full_time = time.time()
@@ -64,6 +68,8 @@ class Predictor(nn.Module):
         # x = torch.cat((x, snip), dim=1)
         # print("2--- %s seconds ---" % (time.time() - start_time))
         # start_time = time.time()
+        if self.batch_norm is not None:
+            x = self.batch_norm(x)
         x, last = self.augmentation(x)
         x = self.gru_layers(x, last)
         # x = nn.LeakyReLU()(x)
@@ -85,18 +91,18 @@ class Predictor(nn.Module):
     def gru_layers(self, x, last):
         x = x.transpose(1, 2)
         x, h = self.gru(x)
-        return x[:, -1, :]
+        return self.leakyRelu(x[:, -1, :])
 
     def last_layers(self, x, last):
         x = self.fs1(x)
-        x = nn.LeakyReLU()(x)
+        x = self.leakyRelu(x)
         x = self.fs2(x)
-        x = nn.LeakyReLU()(x)
+        x = self.leakyRelu(x)
         x = self.fs3(x)
-        x = nn.LeakyReLU()(x)
+        x = self.leakyRelu(x)
         x = torch.cat((x, last), dim=1)
         x = self.last(x)
-        x = nn.LeakyReLU()(x)
+        x = self.leakyRelu(x)
         return x
 
     def snippet_tensor(self, snippet):
